@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lane Quiz Run</title>
+<style>
+:root{color-scheme:dark;--bg:#16123a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:100%;margin:0;background:var(--bg);overflow:hidden;font-family:"Lilita One","Trebuchet MS",system-ui,sans-serif;color:#fff;touch-action:none;user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);padding:10px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#top{display:flex;justify-content:space-between;font-size:18px;text-shadow:0 2px 0 #0006}
+#q{background:#fff;color:#1b1740;border-radius:14px;padding:12px 16px;font-size:clamp(18px,4.2vw,28px);text-align:center;box-shadow:0 4px 0 #0005}
+#tb{height:10px;background:#ffffff33;border-radius:6px;overflow:hidden}#tb i{display:block;height:100%;width:100%;background:#7dff6a}
+#btns{position:fixed;left:0;right:0;bottom:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#btns button{font:inherit;color:#fff;border:0;border-radius:10px;padding:14px 4px;font-size:clamp(13px,3.2vw,20px);box-shadow:0 4px 0 #0006;min-height:56px}
+#btns button.on{transform:translateY(-6px);outline:3px solid #fff}
+#toast{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);font-size:clamp(32px,9vw,64px);opacity:0;pointer-events:none;text-shadow:0 4px 0 #0007;transition:opacity .25s;text-align:center}
+#toast.show{opacity:1}
+#ov{position:fixed;inset:0;background:#16123af0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px}
+#ov h1{font-size:clamp(36px,9vw,72px);margin:0;line-height:1}
+#ov p{margin:0;max-width:36ch;font-family:system-ui,sans-serif;font-size:16px;line-height:1.45;opacity:.9}
+#frm{display:flex;flex-direction:column;gap:10px;width:min(320px,100%)}
+input{font:inherit;font-size:22px;padding:10px 14px;border-radius:12px;border:0;text-align:center;color:#16123a}
+.b{font:inherit;font-size:22px;border:0;border-radius:14px;padding:12px 28px;background:#fff;color:#16123a;box-shadow:0 5px 0 #0007;cursor:pointer}
+.b.alt{background:#7b6cff;color:#fff}
+#er{color:#ff8a9b;min-height:1.2em;font-family:system-ui,sans-serif;font-size:14px}
+#host{position:fixed;inset:0;background:var(--bg);overflow:auto;padding:24px;box-sizing:border-box;text-align:center}
+#host h2{margin:18px 0 6px}.code{font-size:clamp(64px,14vw,140px);letter-spacing:.08em;line-height:1}
+.hq{font-size:clamp(24px,4vw,44px);background:#fff;color:#1b1740;border-radius:16px;padding:16px;max-width:1000px;margin:0 auto}
+.big{font-size:clamp(60px,12vw,120px);line-height:1.1}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:1000px;margin:12px auto}
+.tile{position:relative;overflow:hidden;border-radius:14px;padding:18px;font-size:clamp(18px,3vw,30px);text-align:left;min-height:48px}
+.tile.dim{opacity:.4}.tile b{float:right}.tile i{position:absolute;left:0;bottom:0;height:8px;background:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:900px;margin:12px auto;font-family:system-ui,sans-serif}
+.chips span{background:#ffffff22;padding:6px 12px;border-radius:20px}
+table{margin:12px auto;border-collapse:collapse;min-width:min(720px,100%);font-family:system-ui,sans-serif;font-size:16px}
+th,td{padding:8px 12px;border-bottom:1px solid #ffffff22;text-align:left}td:first-child,th:first-child{text-align:center}
+ol{display:inline-block;text-align:left;font-size:24px;margin:0}.hide{display:none!important}
+</style>
+</head>
+<body>
+<div id="hud" class="hide"><div id="top"><span id="sc">Score 0</span><span id="pg"></span><span id="st"></span></div><div id="q"></div><div id="tb"><i></i></div></div>
+<div id="toast"></div>
+<div id="btns" class="hide"></div>
+<div id="host" class="hide"></div>
+<div id="ov"><h1 id="oh">Lane Quiz Run</h1><p id="op">Live quiz for up to 50 players. Four answers, four lanes: run into the right one before time runs out.</p>
+<div id="frm"><button class="b alt" id="hb">Host a game</button><input id="cd" inputmode="numeric" maxlength="4" placeholder="4-digit game code"><input id="nm" maxlength="14" placeholder="Your name"><button class="b" id="jn">Join game</button><div id="er"></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const COL=["#e21b3c","#1368ce","#d89e00","#26890c"],SH=["▲","◆","●","■"],LX=[-3.3,-1.1,1.1,3.3],SP=12,TL=5,SPAWN=-SP*TL;
+const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
+let WS=null,ROLE=null,LIVE=false,DONE=false,CODE="",LP=[],MAXP=50,cdT=null;
+function ov(h,p,frm){$("oh").textContent=h;$("op").textContent=p;$("frm").classList.toggle("hide",!frm);$("ov").classList.remove("hide")}
+const send=o=>{if(WS&&WS.readyState===1)WS.send(JSON.stringify(o))};
+function connect(){return new Promise((res,rej)=>{if(WS){WS.onclose=null;WS.close()}
+const w=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host);
+w.onopen=()=>{WS=w;res()};w.onerror=()=>rej(new Error("Cannot reach the game server."));
+w.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}onMsg(m)};
+w.onclose=()=>{if(ROLE&&!DONE){LIVE=false;$("host").classList.add("hide");ov("Disconnected","Lost connection to the game server. Reload the page to start again.")}}})}
+const R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));document.body.prepend(R.domElement);
+const S=new THREE.Scene();S.background=new THREE.Color(0x16123a);S.fog=new THREE.Fog(0x16123a,25,68);
+const C=new THREE.PerspectiveCamera(62,1,.1,200);C.position.set(0,4.6,7.5);
+S.add(new THREE.HemisphereLight(0xbfb8ff,0x2a1f5a,1.1));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(4,10,6);S.add(dl);
+function fit(){R.setSize(innerWidth,innerHeight);C.aspect=innerWidth/innerHeight;C.fov=C.aspect<.8?80:62;C.updateProjectionMatrix()}addEventListener("resize",fit);fit();
+const track=new THREE.Mesh(new THREE.PlaneGeometry(9.6,400),new THREE.MeshLambertMaterial({color:0x2c2566}));track.rotation.x=-Math.PI/2;track.position.z=-150;S.add(track);
+const dashes=[],dm=new THREE.MeshBasicMaterial({color:0x6e65c9});
+for(let l=0;l<3;l++)for(let k=0;k<14;k++){const d=new THREE.Mesh(new THREE.PlaneGeometry(.1,3),dm);d.rotation.x=-Math.PI/2;d.position.set(-2.2+l*2.2,.01,-k*8);S.add(d);dashes.push(d)}
+const blds=[],bc=[0x3b2f8f,0x5a3fa8,0x2f6fb0,0x8a3f9c];
+for(let s=-1;s<=1;s+=2)for(let k=0;k<12;k++){const h=3+Math.random()*10,b=new THREE.Mesh(new THREE.BoxGeometry(3+Math.random()*2,h,4),new THREE.MeshLambertMaterial({color:bc[k%4]}));b.position.set(s*(8+Math.random()*3),h/2,-k*10);S.add(b);blds.push(b)}
+const P=new THREE.Group(),M=c=>new THREE.MeshLambertMaterial({color:c});
+const body=new THREE.Mesh(new THREE.BoxGeometry(.8,1,.5),M(0xff5d8f));body.position.y=1.1;
+const head=new THREE.Mesh(new THREE.SphereGeometry(.38,16,12),M(0xffd166));head.position.y=2;
+const cap=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.15,16),M(0x4cc9f0));cap.position.y=2.3;
+const legL=new THREE.Mesh(new THREE.BoxGeometry(.28,.7,.3),M(0x2b2d6e)),legR=legL.clone();legL.position.set(-.2,.35,0);legR.position.set(.2,.35,0);
+P.add(body,head,cap,legL,legR);S.add(P);
+function tex(txt,k){const c=document.createElement("canvas");c.width=256;c.height=320;const x=c.getContext("2d");x.fillStyle=COL[k];x.fillRect(0,0,256,320);
+x.fillStyle="#fff";x.font="64px sans-serif";x.textAlign="center";x.fillText(SH[k],128,90);
+x.font="bold 36px 'Trebuchet MS',sans-serif";x.textBaseline="middle";const L=[];let t="";txt.split(" ").forEach(a=>{const n=t?t+" "+a:a;if(x.measureText(n).width>220&&t){L.push(t);t=a}else t=n});L.push(t);
+L.forEach((l,i)=>x.fillText(l,128,190+(i-(L.length-1)/2)*42));return new THREE.CanvasTexture(c)}
+let gate=null;
+function makeGate(ans){const g=new THREE.Group();ans.forEach((a,k)=>{
+const p=new THREE.Mesh(new THREE.PlaneGeometry(2,2.5),new THREE.MeshBasicMaterial({map:tex(a,k)}));p.position.set(LX[k],1.9,0);g.add(p);
+const f=new THREE.Mesh(new THREE.PlaneGeometry(2.1,4),new THREE.MeshBasicMaterial({color:COL[k],transparent:true,opacity:.45}));f.rotation.x=-Math.PI/2;f.position.set(LX[k],.03,3);g.add(f)});
+g.position.z=SPAWN;S.add(g);return g}
+let G={mode:"menu",i:0,score:0,lane:1,lockT:0,ans:[],shake:0,jump:0};
+const bt=$("btns");[0,1,2,3].forEach(k=>{const b=document.createElement("button");b.style.background=COL[k];b.onclick=()=>setLane(k);bt.appendChild(b)});
+const tl=()=>gate?Math.max(0,-gate.position.z/SP):0;
+function setLane(k){if(G.mode!="play")return;if(k!==G.lane||!G.lockT)G.lockT=tl()||.01;G.lane=k;send({t:"pick",lane:k});[...bt.children].forEach((b,j)=>b.classList.toggle("on",j==k))}
+function toast(t,c){const e=$("toast");e.textContent=t;e.style.color=c;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),1400)}
+function startQ(m){if(gate)S.remove(gate);G.i=m.qi;G.ans=m.answers;$("q").textContent=m.text;$("pg").textContent=(m.qi+1)+"/"+m.total;
+[...bt.children].forEach((b,k)=>{b.textContent=G.ans[k];b.classList.remove("on")});gate=makeGate(G.ans);G.mode="play";G.lockT=0;
+$("ov").classList.add("hide");$("hud").classList.remove("hide");bt.classList.remove("hide")}
+function resolve(){G.mode="wait";$("tb").firstChild.style.width="0%"}
+function showR(m){G.mode="wait";G.score=m.s;if(m.pts>0){G.jump=1;toast("Correct! +"+m.pts,"#7dff6a")}else{G.shake=1;toast((m.picked?"It was: ":"Time’s up! It was: ")+m.correct,"#ff6b81")}
+$("sc").textContent="Score "+m.s;$("st").textContent="#"+m.rank+" of "+m.n}
+function showEnd(m){DONE=true;G.mode="end";$("hud").classList.add("hide");bt.classList.add("hide");ov("You placed #"+m.rank,"Final score: "+m.s+" · "+m.n+" players. Thanks for playing!")}
+const H=h=>{$("host").innerHTML=h};
+function lobby(){H(`<h2>Join this game</h2><p>On your phone, open <b>${esc(location.host)}</b> and enter this code</p><div class="code">${CODE}</div><h2>${LP.length} / ${MAXP} players</h2><div class="chips">${LP.map(n=>`<span>${esc(n)}</span>`).join("")}</div><button class="b" ${LP.length?"":"disabled"} onclick="send({t:'start'})">Start game</button>`)}
+function hq(m){H(`<div class="hq">${esc(m.text)}</div><div class="big" id="cdn">${m.tl}</div><div class="tiles">${m.answers.map((x,k)=>`<div class="tile" style="background:${COL[k]}">${SH[k]} ${esc(x)}</div>`).join("")}</div><p>Question ${m.qi+1} of ${m.total} · ${LP.length} players</p>`);
+const t0=Date.now();clearInterval(cdT);cdT=setInterval(()=>{const e=$("cdn");if(e)e.textContent=Math.max(0,Math.ceil(m.tl-(Date.now()-t0)/1000))},200)}
+function hr(m){clearInterval(cdT);H(`<div class="hq">${esc(m.text)}</div><div class="tiles">${m.answers.map((x,k)=>`<div class="tile ${k===m.cor?"":"dim"}" style="background:${COL[k]}">${SH[k]} ${esc(x)}${k===m.cor?" ✓":""}<b>${m.d[k]}</b><i style="width:${m.n?m.d[k]/m.n*100:0}%"></i></div>`).join("")}</div><h2>Top 5</h2><ol>${m.top.map(r=>`<li>${esc(r[0])} — ${r[1]}</li>`).join("")}</ol>`)}
+function hend(m){DONE=true;H(`<h1>Final ranking</h1><table><tr><th>#</th><th>Player</th><th>Score</th><th>Correct</th><th>Avg time on correct</th></tr>${m.rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.n)}</td><td>${r.s}</td><td>${r.c}/${m.total}</td><td>${r.avg!==null?r.avg+"s":"–"}</td></tr>`).join("")}</table><h2>Correct answers by question</h2><table>${m.acc.map((a,i)=>`<tr><td>Q${i+1}</td><td style="text-align:left">${esc(a.q)}</td><td>${a.pct}%</td></tr>`).join("")}</table>`)}
+function onMsg(m){
+if(m.t==="err"){if(!ROLE)$("er").textContent=m.m;else ov("Game over",m.m)}
+else if(m.t==="hosted"){ROLE="h";CODE=m.code;$("ov").classList.add("hide");$("host").classList.remove("hide");lobby()}
+else if(m.t==="joined"){ROLE="p";LIVE=true;ov("You’re in, "+m.name,"Waiting for the host to start…")}
+else if(m.t==="lobby"){if(ROLE==="h"){LP=m.players;MAXP=m.max;lobby()}else if(ROLE==="p")ov($("oh").textContent,"Waiting for the host to start… "+m.n+" player(s) joined.")}
+else if(m.t==="q"){if(ROLE==="h")hq(m);else startQ(m)}
+else if(m.t==="r"){if(ROLE==="h")hr(m);else showR(m)}
+else if(m.t==="end"){if(ROLE==="h")hend(m);else showEnd(m)}}
+$("hb").onclick=async()=>{$("er").textContent="";try{await connect();send({t:"host"})}catch(e){$("er").textContent=e.message}};
+$("jn").onclick=async()=>{const c=$("cd").value.trim(),n=$("nm").value.trim();if(!/^\d{4}$/.test(c)||!n){$("er").textContent="Enter the 4-digit code and your name.";return}
+$("er").textContent="";try{await connect();send({t:"join",code:c,name:n})}catch(e){$("er").textContent=e.message}};
+addEventListener("keydown",e=>{const k=e.key.toLowerCase();if(document.activeElement.tagName=="INPUT")return;if(k=="arrowleft"||k=="a")setLane(Math.max(0,G.lane-1));else if(k=="arrowright"||k=="d")setLane(Math.min(3,G.lane+1));else if("1234".includes(k)&&k.length==1)setLane(+k-1)});
+let sx=null;addEventListener("touchstart",e=>{sx=e.touches[0].clientX},{passive:true});
+addEventListener("touchend",e=>{if(sx===null)return;const d=e.changedTouches[0].clientX-sx;if(Math.abs(d)>30)setLane(Math.max(0,Math.min(3,G.lane+(d>0?1:-1))));sx=null});
+const clk=new THREE.Clock();let T=0;
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clk.getDelta(),.05);if(!LIVE)return;T+=dt;const mv=SP*dt;
+dashes.forEach(d=>{d.position.z+=mv;if(d.position.z>8)d.position.z-=112});blds.forEach(b=>{b.position.z+=mv;if(b.position.z>12)b.position.z-=120});
+if(gate){gate.position.z+=mv;if(G.mode=="play"&&gate.position.z>=0)resolve();if(gate.position.z>10){S.remove(gate);gate=null}}
+if(G.mode=="play")$("tb").firstChild.style.width=tl()/TL*100+"%";
+P.position.x+=(LX[G.lane]-P.position.x)*Math.min(1,dt*14);G.jump=Math.max(0,G.jump-dt*1.6);const jy=Math.sin(G.jump*Math.PI)*1.4;
+P.position.y=jy+(jy>0?0:Math.abs(Math.sin(T*12))*.12);legL.rotation.x=Math.sin(T*12)*.8;legR.rotation.x=-Math.sin(T*12)*.8;
+G.shake=Math.max(0,G.shake-dt*2.5);C.position.x=P.position.x*.4+(Math.random()-.5)*G.shake*.4;C.position.y=4.6+(Math.random()-.5)*G.shake*.3;C.lookAt(P.position.x*.4,1.4,-10);R.render(S,C)}
+loop();
+</script>
+</body>
+</html>

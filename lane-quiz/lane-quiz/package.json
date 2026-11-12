@@ -1,0 +1,9 @@
+{
+  "name": "lane-quiz",
+  "version": "1.0.0",
+  "description": "Live 3D lane quiz game (Kahoot-style) for up to 50 players",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}

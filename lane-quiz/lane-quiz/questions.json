@@ -1,0 +1,12 @@
+[
+ {"q":"In infrastructure mode, the access point acts as a…","a":"Central hub","w":["Printer","Antivirus","Battery"]},
+ {"q":"Which encryption is insecure and no longer recommended?","a":"WEP","w":["WPA2","WPA3","AES"]},
+ {"q":"Which is the latest wireless security protocol?","a":"WPA3","w":["WEP","WPA","SSID"]},
+ {"q":"Which two frequencies do Wi-Fi networks usually use?","a":"2.4GHz and 5GHz","w":["1GHz and 3GHz","10GHz and 20GHz","100MHz and 900MHz"]},
+ {"q":"What is an evil twin attack?","a":"A fake access point copying a real one","w":["A virus on a laptop","A broken router","A strong password"]},
+ {"q":"Which attack stops users from using the network?","a":"Denial of Service","w":["Wardriving","Wireless site survey","Captive portal"]},
+ {"q":"Which tool captures and analyzes wireless traffic?","a":"Wireshark","w":["Excel","Photoshop","Chrome"]},
+ {"q":"Which is a good Wi-Fi password practice?","a":"Strong and unique","w":["Use the default","Use 12345678","Share it with everyone"]},
+ {"q":"Which technology connects headsets and speakers?","a":"Bluetooth","w":["WiMAX","Satellite","LTE"]},
+ {"q":"What does a firewall do?","a":"Controls network traffic","w":["Boosts the signal","Charges the phone","Plays music"]}
+]
